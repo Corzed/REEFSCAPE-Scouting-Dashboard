@@ -25,4 +25,5 @@ A lightweight web dashboard for visualizing scoring data from The Blue Alliance 
    git clone https://github.com/Corzed/REEFSCAPE-Scouting-Dashboard.git
    cd REEFSCAPE-Scouting-Dashboard
    ```
-2. **Open index.html in your web browser**
+2. **Open the Dashboard**:
+   Open index.html in your web browser.
