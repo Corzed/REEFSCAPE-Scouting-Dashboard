@@ -26,4 +26,5 @@ A lightweight web dashboard for visualizing scoring data from The Blue Alliance 
    cd REEFSCAPE-Scouting-Dashboard
    ```
 2. **Open the Dashboard**:
+   
    Open index.html in your web browser.
