@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>REEFSCAPE Dashboard</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #1b1b1b;
+        color: #eee;
+      }
+      header {
+        background: #2c2c2c;
+        padding: 0.8rem 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      #title { font-size: 1.2rem; font-weight: bold; margin: 0; }
+      #inputArea {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      #inputArea label { font-size: 0.9rem; }
+      #inputArea input {
+        background: #444;
+        border: 1px solid #666;
+        border-radius: 4px;
+        padding: 0.2rem 0.5rem;
+        color: #fff;
+      }
+      button {
+        background: #3a8dde;
+        border: none;
+        color: #fff;
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+      button:hover { background: #347dc8; }
+      main {
+        padding: 1rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      #status { margin: 0.5rem 0 1rem; font-style: italic; color: #ccc; }
+      h2 { margin: 2rem 0 0.5rem; font-size: 1.1rem; color: #fff; }
+      .chart-section {
+        background: #2c2c2c;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 5px;
+        position: relative;
+      }
+      .chart-container {
+        width: 100%;
+        position: relative;
+        margin-bottom: 1rem;
+      }
+      canvas { background: #fff; border-radius: 6px; }
+      .desc {
+        font-style: italic;
+        font-size: 0.9rem;
+        color: #ccc;
+        margin-bottom: 1rem;
+      }
+      /* Position toggle button in the coral section */
+      #toggleModeButton {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+        background: #2c2c2c;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      th, td {
+        padding: 0.5rem 0.7rem;
+        border-bottom: 1px solid #444;
+      }
+      th { background: #3a3a3a; text-align: left; }
+      tr:hover { background: #353535; }
+      .rank-col { width: 60px; text-align: right; }
+      .team-col { width: 140px; }
+      .score-col { text-align: right; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header>
+      <p id="title">REEFSCAPE Dashboard</p>
+      <div id="inputArea">
+        <label>TBA Key</label>
+        <input type="text" id="tbaKey" placeholder="Auth Key">
+        <label>Event Key</label>
+        <input type="text" id="eventKey" placeholder="e.g. 2025miket">
+        <button id="loadButton">Load Data</button>
+        <button id="downloadButton" disabled>Download JSON</button>
+      </div>
+    </header>
+    <main>
+      <p id="status">Waiting...</p>
+      <div class="chart-section">
+        <h2>REEF Stacked Bar</h2>
+        <div class="chart-container">
+        <button id="toggleModeButton">Switch to Auto</button>
+          <canvas id="reefChart"></canvas>
+        </div>
+        <p class="desc">
+          Shows L1 (trough), L2 (botRow), L3 (midRow), L4 (topRow) stacked for each team.
+        </p>
+      </div>
+      <div class="chart-section">
+        <h2>Algae + Endgame Stacked Bar</h2>
+        <div class="chart-container">
+          <canvas id="algaeEndChart"></canvas>
+        </div>
+        <p class="desc">
+          Stacked bars for Processor (wall), Net (net), and Endgame Barge (end) points per team.
+        </p>
+      </div>
+      <div class="chart-section">
+        <h2>Overall Ranking</h2>
+        <p class="desc">
+          Sum of all Reef & Algae/Endgame categories. Sorted high to low.
+        </p>
+        <table id="rankingTable">
+          <thead>
+            <tr>
+              <th class="rank-col">Rank</th>
+              <th class="team-col">Team</th>
+              <th class="score-col">Total Avg</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="desc">
+        Data is not team specific, only an approximation based on match scoring and team alliances.
+      </p>
+      <p class="desc">
+        Made by github.com/Corzed
+      </p>
+    </main>
+    <script>
+      let storedETag = null;
+      let storedLastMod = null;
+      let matchData = [];
+      let currentMode = 'teleop'; // 'teleop' or 'auto'
+      let reefChartInstance = null;
+      let algaeEndChartInstance = null;
+
+      // Use the correct property "autoReef" (not "autonReef") when in auto mode.
+      function getReefCategories() {
+        if (currentMode === 'teleop') {
+          return [
+            { k: 'l1', ex: a => a.teleopReef?.trough },
+            { k: 'l2', ex: a => a.teleopReef?.tba_botRowCount },
+            { k: 'l3', ex: a => a.teleopReef?.tba_midRowCount },
+            { k: 'l4', ex: a => a.teleopReef?.tba_topRowCount }
+          ];
+        } else {
+          return [
+            { k: 'l1', ex: a => a.autoReef?.trough },
+            { k: 'l2', ex: a => a.autoReef?.tba_botRowCount },
+            { k: 'l3', ex: a => a.autoReef?.tba_midRowCount },
+            { k: 'l4', ex: a => a.autoReef?.tba_topRowCount }
+          ];
+        }
+      }
+
+      function dynamicHeight(container, rowCount) {
+        container.style.height = Math.max(rowCount * 30, 400) + 'px';
+      }
+
+      async function fetchTBA(endpoint, tbaKey) {
+        let url = 'https://www.thebluealliance.com/api/v3/' + endpoint;
+        let hdr = { 'X-TBA-Auth-Key': tbaKey, 'Accept-Encoding': 'gzip' };
+        if (storedETag) hdr['If-None-Match'] = storedETag;
+        if (storedLastMod) hdr['If-Modified-Since'] = storedLastMod;
+        let r = await fetch(url, { headers: hdr });
+        if (r.status === 304) return null;
+        if (!r.ok) throw new Error('TBA request fail: ' + r.status);
+        let e = r.headers.get('ETag'), lm = r.headers.get('Last-Modified');
+        if (e) storedETag = e;
+        if (lm) storedLastMod = lm;
+        return r.json();
+      }
+
+      function aggregator(matches, catMap) {
+        let dataMap = {}, mCount = {};
+        for (let m of matches) {
+          let b = m?.score_breakdown?.blue;
+          let r = m?.score_breakdown?.red;
+          let tB = m?.alliances?.blue?.team_keys || [];
+          let tR = m?.alliances?.red?.team_keys || [];
+          if (!b || !r) continue;
+          for (let c of catMap) {
+            let vB = c.ex(b) || 0;
+            let vR = c.ex(r) || 0;
+            for (let tm of tB) {
+              if (!dataMap[tm]) dataMap[tm] = {};
+              if (!dataMap[tm][c.k]) dataMap[tm][c.k] = 0;
+              dataMap[tm][c.k] += vB;
+              mCount[tm] = (mCount[tm] || 0) + 1;
+            }
+            for (let tm of tR) {
+              if (!dataMap[tm]) dataMap[tm] = {};
+              if (!dataMap[tm][c.k]) dataMap[tm][c.k] = 0;
+              dataMap[tm][c.k] += vR;
+              mCount[tm] = (mCount[tm] || 0) + 1;
+            }
+          }
+        }
+        for (let tm in dataMap) {
+          let played = mCount[tm] || 1;
+          for (let cat in dataMap[tm]) {
+            dataMap[tm][cat] = dataMap[tm][cat] / played;
+          }
+        }
+        return dataMap;
+      }
+
+      function createStackedChart(canvasId, dataMap, catKeys, catLabels, catColors, title) {
+        let container = document.getElementById(canvasId).parentNode;
+        let teams = Object.keys(dataMap);
+        teams.sort((a, b) => {
+          let sA = 0, sB = 0;
+          for (let ck of catKeys) {
+            sA += dataMap[a][ck] || 0;
+            sB += dataMap[b][ck] || 0;
+          }
+          return sB - sA;
+        });
+        dynamicHeight(container, teams.length);
+        let datasets = catKeys.map((ck, i) => ({
+          label: catLabels[i],
+          data: teams.map(x => dataMap[x][ck] || 0),
+          backgroundColor: catColors[i],
+          hoverBackgroundColor: '#444'
+        }));
+        return new Chart(document.getElementById(canvasId), {
+          type: 'bar',
+          data: { labels: teams, datasets },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
+            plugins: {
+              title: { display: true, text: title, font: { size: 16 } },
+              tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.x.toFixed(2) } },
+              legend: { labels: { font: { size: 12 } } }
+            },
+            animation: { duration: 800, easing: 'easeInOutCubic' },
+            barThickness: 16,
+            maxBarThickness: 22
+          }
+        });
+      }
+
+      function buildTable(tableSel, dataMap, catKeys) {
+        let tb = document.querySelector(tableSel + ' tbody');
+        tb.innerHTML = '';
+        let allTeams = Object.keys(dataMap);
+        let items = allTeams.map(t => {
+          let s = 0;
+          for (let ck of catKeys) s += dataMap[t][ck] || 0;
+          return { team: t, sum: s };
+        });
+        items.sort((a, b) => b.sum - a.sum);
+        items.forEach((x, i) => {
+          let tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class='rank-col'>${i + 1}</td>
+            <td class='team-col'>${x.team}</td>
+            <td class='score-col'>${x.sum.toFixed(2)}</td>
+          `;
+          tb.appendChild(tr);
+        });
+      }
+
+      function downloadRawData() {
+        if (!matchData || !Array.isArray(matchData) || matchData.length === 0) {
+          alert('No data loaded yet');
+          return;
+        }
+        let str = JSON.stringify(matchData, null, 2);
+        let blob = new Blob([str], { type: 'application/json' });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = 'tba_raw_data.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      async function loadData() {
+        let st = document.getElementById('status');
+        let tba = document.getElementById('tbaKey').value.trim();
+        let evt = document.getElementById('eventKey').value.trim();
+        if (!tba || !evt) {
+          st.textContent = 'Enter TBA key and event key';
+          return;
+        }
+        try {
+          st.textContent = 'Loading...';
+          let d = await fetchTBA(`event/${evt}/matches`, tba);
+          if (d === null) {
+            st.textContent = 'Data not modified';
+          } else if (!Array.isArray(d)) {
+            console.error('No valid matches array', d);
+            st.textContent = 'No valid matches array';
+            return;
+          } else {
+            matchData = d;
+            console.log('Fetched matches', matchData);
+            st.textContent = `Fetched ${matchData.length} matches`;
+          }
+          if (!Array.isArray(matchData) || matchData.length === 0) {
+            st.textContent = 'No match data';
+            return;
+          }
+          document.getElementById('downloadButton').disabled = false;
+          updateCharts();
+        } catch (e) {
+          console.error(e);
+          st.textContent = 'Error: ' + e.message;
+        }
+      }
+
+      function updateCharts() {
+        let reefCats = getReefCategories();
+        let algaeEndCats = [
+          { k: 'wall', ex: a => a.wallAlgaeCount },
+          { k: 'net', ex: a => a.netAlgaeCount },
+          { k: 'end', ex: a => a.endGameBargePoints }
+        ];
+        let allCats = [...reefCats, ...algaeEndCats];
+        let reefDataMap = aggregator(matchData, reefCats);
+        let algaeEndDataMap = aggregator(matchData, algaeEndCats);
+        let overallDataMap = aggregator(matchData, allCats);
+
+        if (reefChartInstance) reefChartInstance.destroy();
+        if (algaeEndChartInstance) algaeEndChartInstance.destroy();
+
+        reefChartInstance = createStackedChart('reefChart', reefDataMap,
+          ['l1', 'l2', 'l3', 'l4'],
+          ['L1', 'L2', 'L3', 'L4'],
+          ['#3366cc', '#dc3912', '#ff9900', '#109618'],
+          'REEF L1–L4 (' + currentMode + ')'
+        );
+        algaeEndChartInstance = createStackedChart('algaeEndChart', algaeEndDataMap,
+          ['wall', 'net', 'end'],
+          ['Processor', 'Net', 'Endgame'],
+          ['#990099', '#0099c6', '#dd4477'],
+          'Algae + Endgame'
+        );
+        buildTable('#rankingTable', overallDataMap, ['l1', 'l2', 'l3', 'l4', 'wall', 'net', 'end']);
+      }
+
+      // Toggle mode between teleop and auto.
+      function toggleMode() {
+        currentMode = (currentMode === 'teleop') ? 'auto' : 'teleop';
+        document.getElementById('toggleModeButton').textContent =
+          (currentMode === 'teleop') ? 'Switch to Auto' : 'Switch to Teleop';
+        if (matchData && matchData.length > 0) {
+          updateCharts();
+        }
+      }
+
+      document.getElementById('loadButton').addEventListener('click', loadData);
+      document.getElementById('downloadButton').addEventListener('click', downloadRawData);
+      document.getElementById('toggleModeButton').addEventListener('click', toggleMode);
+    </script>
+  </body>
+</html>
