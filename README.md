@@ -28,3 +28,7 @@ A lightweight web dashboard for visualizing scoring data from The Blue Alliance 
 2. **Open the Dashboard**:
    
    Open index.html in your web browser.
+
+### Contributions
+Contributions are absolutely welcome, you can fork the repo and make a pull request to contribute.
+(The code is pretty ugly...)
