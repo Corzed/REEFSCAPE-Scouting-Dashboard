@@ -91,6 +91,80 @@
       .rank-col { width: 60px; text-align: right; }
       .team-col { width: 140px; }
       .score-col { text-align: right; }
+      
+      /* Video lookup section styles */
+      .video-section {
+        background: #2c2c2c;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 5px;
+        position: relative;
+      }
+      #teamSearchArea {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        align-items: center;
+      }
+      #teamSearchArea input {
+        background: #444;
+        border: 1px solid #666;
+        border-radius: 4px;
+        padding: 0.4rem 0.7rem;
+        color: #fff;
+        width: 120px;
+      }
+      #videoList {
+        max-height: 400px;
+        overflow-y: auto;
+        margin-top: 1rem;
+      }
+      .video-item {
+        padding: 0.8rem;
+        border-bottom: 1px solid #444;
+        cursor: pointer;
+      }
+      .video-item:hover {
+        background: #353535;
+      }
+      .video-title {
+        font-weight: bold;
+        margin-bottom: 0.3rem;
+      }
+      .video-url {
+        color: #3a8dde;
+        word-break: break-all;
+        font-size: 0.9rem;
+      }
+      .video-container {
+        display: none;
+        margin-top: 1rem;
+      }
+      .video-embed {
+        width: 100%;
+        height: 480px;
+        border: none;
+        border-radius: 5px;
+      }
+      .video-controls {
+        margin-top: 0.5rem;
+        display: flex;
+        justify-content: flex-end;
+      }
+      .state-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        font-style: italic;
+        color: #ccc;
+      }
+      .state-no-results {
+        padding: 1rem;
+        text-align: center;
+        font-style: italic;
+        color: #ccc;
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
@@ -108,6 +182,25 @@
     </header>
     <main>
       <p id="status">Waiting...</p>
+      
+      <!-- New Team Video Section -->
+      <div class="video-section">
+        <h2>Team Video Lookup</h2>
+        <div id="teamSearchArea">
+          <label>Team Number</label>
+          <input type="text" id="teamNumber" placeholder="e.g. 254">
+          <button id="searchTeamButton">Find Videos</button>
+        </div>
+        <div id="videoStatus" class="desc">Enter a team number to find match videos.</div>
+        <div id="videoList"></div>
+        <div id="videoContainer" class="video-container">
+          <iframe id="videoEmbed" class="video-embed" allowfullscreen></iframe>
+          <div class="video-controls">
+            <button id="closeVideoButton">Close Video</button>
+          </div>
+        </div>
+      </div>
+      
       <div class="chart-section">
         <h2>REEF Stacked Bar</h2>
         <div class="chart-container">
@@ -157,8 +250,8 @@
       let currentMode = 'teleop'; // 'teleop' or 'auto'
       let reefChartInstance = null;
       let algaeEndChartInstance = null;
-
-      // Use the correct property "autoReef" (not "autonReef") when in auto mode.
+      
+      /* Original REEFSCAPE functions */
       function getReefCategories() {
         if (currentMode === 'teleop') {
           return [
@@ -369,7 +462,6 @@
         buildTable('#rankingTable', overallDataMap, ['l1', 'l2', 'l3', 'l4', 'wall', 'net', 'end']);
       }
 
-      // Toggle mode between teleop and auto.
       function toggleMode() {
         currentMode = (currentMode === 'teleop') ? 'auto' : 'teleop';
         document.getElementById('toggleModeButton').textContent =
@@ -378,10 +470,190 @@
           updateCharts();
         }
       }
+      
+      /* New Team Video Lookup functions */
+      async function findTeamVideos() {
+        const videoStatus = document.getElementById('videoStatus');
+        const videoList = document.getElementById('videoList');
+        const teamNumberInput = document.getElementById('teamNumber');
+        const eventKeyInput = document.getElementById('eventKey');
+        const tbaKeyInput = document.getElementById('tbaKey');
+        
+        const teamNumber = teamNumberInput.value.trim();
+        const eventKey = eventKeyInput.value.trim();
+        const tbaKey = tbaKeyInput.value.trim();
+        
+        if (!teamNumber) {
+          videoStatus.textContent = 'Please enter a team number';
+          return;
+        }
+        
+        if (!eventKey) {
+          videoStatus.textContent = 'Please enter an event key';
+          return;
+        }
+        
+        if (!tbaKey) {
+          videoStatus.textContent = 'Please enter a TBA API key';
+          return;
+        }
+        
+        // Reset the video container and list
+        document.getElementById('videoContainer').style.display = 'none';
+        videoList.innerHTML = '<div class="state-loading">Loading videos for team ' + teamNumber + '...</div>';
+        videoStatus.textContent = 'Searching for videos...';
+        
+        try {
+          // Build the team key (e.g., "frc254")
+          const teamKey = 'frc' + teamNumber;
+          
+          // Fetch team matches at the specified event
+          const matches = await fetchTBA(`team/${teamKey}/event/${eventKey}/matches`, tbaKey);
+          
+          if (!matches || !Array.isArray(matches) || matches.length === 0) {
+            videoList.innerHTML = '<div class="state-no-results">No matches found for this team at this event.</div>';
+            videoStatus.textContent = 'No matches found.';
+            return;
+          }
+          
+          // Extract videos from matches
+          const videos = [];
+          for (const match of matches) {
+            if (match.videos && match.videos.length > 0) {
+              for (const video of match.videos) {
+                // Currently only support YouTube
+                if (video.type === 'youtube') {
+                  // Create video entry
+                  videos.push({
+                    key: video.key,
+                    match_key: match.key,
+                    comp_level: match.comp_level,
+                    match_number: match.match_number,
+                    set_number: match.set_number,
+                    actual_time: match.actual_time || match.predicted_time,
+                    blue_teams: match.alliances?.blue?.team_keys || [],
+                    red_teams: match.alliances?.red?.team_keys || [],
+                    blue_score: match.alliances?.blue?.score,
+                    red_score: match.alliances?.red?.score,
+                    winning_alliance: match.winning_alliance
+                  });
+                }
+              }
+            }
+          }
+          
+          // Sort videos by match time (if available) or match number
+          videos.sort((a, b) => {
+            if (a.actual_time && b.actual_time) {
+              return a.actual_time - b.actual_time;
+            }
+            if (a.comp_level !== b.comp_level) {
+              // Order: qm, ef, qf, sf, f
+              const levels = { qm: 0, ef: 1, qf: 2, sf: 3, f: 4 };
+              return levels[a.comp_level] - levels[b.comp_level];
+            }
+            if (a.set_number !== b.set_number) {
+              return a.set_number - b.set_number;
+            }
+            return a.match_number - b.match_number;
+          });
+          
+          if (videos.length === 0) {
+            videoList.innerHTML = '<div class="state-no-results">No videos found for this team at this event.</div>';
+            videoStatus.textContent = 'No videos found.';
+            return;
+          }
+          
+          // Format and display the videos
+          videoList.innerHTML = '';
+          videos.forEach((video, index) => {
+            // Determine match type for display
+            let matchType;
+            switch (video.comp_level) {
+              case 'qm': matchType = 'Qualification'; break;
+              case 'ef': matchType = 'Eighth-Final'; break;
+              case 'qf': matchType = 'Quarter-Final'; break;
+              case 'sf': matchType = 'Semi-Final'; break;
+              case 'f': matchType = 'Final'; break;
+              default: matchType = video.comp_level.toUpperCase();
+            }
+            
+            // Add set number if applicable
+            const matchDisplay = video.comp_level !== 'qm' && video.set_number 
+              ? `${matchType} ${video.set_number}-${video.match_number}`
+              : `${matchType} ${video.match_number}`;
+            
+            // Determine which alliance the team is on
+            const isBlue = video.blue_teams.includes(teamKey);
+            const teamAlliance = isBlue ? 'blue' : 'red';
+            
+            // Determine if team won
+            const didWin = (teamAlliance === video.winning_alliance);
+            const matchResult = video.winning_alliance 
+              ? (didWin ? ' (Win)' : ' (Loss)') 
+              : '';
+            
+            // Create the video item element
+            const videoItem = document.createElement('div');
+            videoItem.className = 'video-item';
+            videoItem.innerHTML = `
+              <div class="video-title">${matchDisplay}${matchResult}</div>
+              <div class="video-url">https://www.youtube.com/watch?v=${video.key}</div>
+            `;
+            
+            // Add click event to play the video
+            videoItem.addEventListener('click', () => {
+              playVideo(video.key);
+            });
+            
+            videoList.appendChild(videoItem);
+          });
+          
+          videoStatus.textContent = `Found ${videos.length} videos for team ${teamNumber} at this event.`;
+          
+        } catch (error) {
+          console.error('Error fetching team videos:', error);
+          videoList.innerHTML = '<div class="state-no-results">Error fetching videos: ' + error.message + '</div>';
+          videoStatus.textContent = 'Error: ' + error.message;
+        }
+      }
+      
+      function playVideo(videoKey) {
+        const videoContainer = document.getElementById('videoContainer');
+        const videoEmbed = document.getElementById('videoEmbed');
+        
+        // Set up the YouTube embed URL
+        videoEmbed.src = `https://www.youtube.com/embed/${videoKey}`;
+        
+        // Show the video container
+        videoContainer.style.display = 'block';
+        
+        // Scroll to the video
+        videoContainer.scrollIntoView({ behavior: 'smooth' });
+      }
+      
+      function closeVideo() {
+        const videoContainer = document.getElementById('videoContainer');
+        const videoEmbed = document.getElementById('videoEmbed');
+        
+        // Hide the container and clear the iframe source
+        videoContainer.style.display = 'none';
+        videoEmbed.src = '';
+      }
 
+      /* Event Listeners */
       document.getElementById('loadButton').addEventListener('click', loadData);
       document.getElementById('downloadButton').addEventListener('click', downloadRawData);
       document.getElementById('toggleModeButton').addEventListener('click', toggleMode);
+      document.getElementById('searchTeamButton').addEventListener('click', findTeamVideos);
+      document.getElementById('closeVideoButton').addEventListener('click', closeVideo);
+      
+      // Also allow pressing Enter in the team number input
+      document.getElementById('teamNumber').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          findTeamVideos();
+        }
+      });
     </script>
   </body>
 </html>
