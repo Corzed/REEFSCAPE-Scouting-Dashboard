@@ -4,6 +4,7 @@ A lightweight web dashboard for visualizing scoring data from The Blue Alliance 
 
 ## Features
 
+- **Team Video Search:** Find all matches played by a team quickly.
 - **Dynamic Data Loading:** Fetch match data from TBA using an Auth Key and Event Key.
 - **Reef Stacked Bar Chart:** Visualizes Reef scoring (L1–L4) using teleop or auto data.
 - **Algae + Endgame Chart:** Displays stacked bars for Processor, Net, and Endgame Barge points.
