@@ -17,20 +17,37 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.5rem;
       }
       #title { font-size: 1.2rem; font-weight: bold; margin: 0; }
       #inputArea {
         display: flex;
         gap: 0.5rem;
         align-items: center;
+        flex-wrap: wrap;
       }
-      #inputArea label { font-size: 0.9rem; }
+      #inputArea label { font-size: 0.9rem; white-space: nowrap; }
       #inputArea input {
         background: #444;
         border: 1px solid #666;
         border-radius: 4px;
         padding: 0.2rem 0.5rem;
         color: #fff;
+        min-width: 120px;
+      }
+      #inputArea input.error {
+        border-color: #dc3912;
+        animation: shake 0.3s;
+      }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+      }
+      #inputArea input:focus {
+        outline: none;
+        border-color: #3a8dde;
       }
       button {
         background: #3a8dde;
@@ -40,8 +57,17 @@
         border-radius: 4px;
         cursor: pointer;
         font-size: 0.9rem;
+        transition: background 0.2s, opacity 0.2s;
       }
-      button:hover { background: #347dc8; }
+      button:hover:not(:disabled) { background: #347dc8; }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      button:focus {
+        outline: 2px solid #3a8dde;
+        outline-offset: 2px;
+      }
       main {
         padding: 1rem;
         max-width: 1200px;
@@ -165,77 +191,129 @@
         font-style: italic;
         color: #ccc;
       }
+      /* Loading spinner */
+      .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #666;
+        border-top-color: #3a8dde;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin-left: 0.5rem;
+        vertical-align: middle;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      /* Mobile responsive improvements */
+      @media (max-width: 768px) {
+        header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        #inputArea {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        #inputArea input,
+        #inputArea button {
+          width: 100%;
+        }
+        #teamSearchArea {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        #teamSearchArea input,
+        #teamSearchArea button {
+          width: 100%;
+        }
+        .video-embed {
+          height: 300px;
+        }
+      }
+      @media (max-width: 480px) {
+        #title {
+          font-size: 1rem;
+        }
+        h2 {
+          font-size: 1rem;
+        }
+        table {
+          font-size: 0.85rem;
+        }
+      }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
     <header>
-      <p id="title">REEFSCAPE Dashboard</p>
-      <div id="inputArea">
-        <label>TBA Key</label>
-        <input type="text" id="tbaKey" placeholder="Auth Key">
-        <label>Event Key</label>
-        <input type="text" id="eventKey" placeholder="e.g. 2025miket">
-        <button id="loadButton">Load Data</button>
-        <button id="downloadButton" disabled>Download JSON</button>
+      <h1 id="title">REEFSCAPE Dashboard</h1>
+      <div id="inputArea" role="form" aria-label="Data loading controls">
+        <label for="tbaKey">TBA Key</label>
+        <input type="text" id="tbaKey" placeholder="Auth Key" aria-label="The Blue Alliance API Key" autocomplete="off">
+        <label for="eventKey">Event Key</label>
+        <input type="text" id="eventKey" placeholder="e.g. 2025miket" aria-label="Event Key" autocomplete="off">
+        <button id="loadButton" aria-label="Load match data from The Blue Alliance">Load Data</button>
+        <button id="downloadButton" disabled aria-label="Download raw JSON data">Download JSON</button>
       </div>
     </header>
     <main>
       <p id="status">Waiting...</p>
       
-      <!-- New Team Video Section -->
-      <div class="video-section">
-        <h2>Team Video Lookup</h2>
-        <div id="teamSearchArea">
-          <label>Team Number</label>
-          <input type="text" id="teamNumber" placeholder="e.g. 107">
-          <button id="searchTeamButton">Find Videos</button>
+      <!-- Team Video Lookup Section -->
+      <section class="video-section" aria-labelledby="videoSectionTitle">
+        <h2 id="videoSectionTitle">Team Video Lookup</h2>
+        <div id="teamSearchArea" role="search" aria-label="Team video search">
+          <label for="teamNumber">Team Number</label>
+          <input type="text" id="teamNumber" placeholder="e.g. 107" aria-label="Team number" inputmode="numeric" pattern="[0-9]*">
+          <button id="searchTeamButton" aria-label="Find videos for team">Find Videos</button>
         </div>
-        <div id="videoStatus" class="desc">Enter a team number to find match videos.</div>
-        <div id="videoList"></div>
+        <div id="videoStatus" class="desc" role="status" aria-live="polite">Enter a team number to find match videos.</div>
+        <div id="videoList" role="list" aria-label="Match videos"></div>
         <div id="videoContainer" class="video-container">
-          <iframe id="videoEmbed" class="video-embed" allowfullscreen></iframe>
+          <iframe id="videoEmbed" class="video-embed" allowfullscreen title="Match video player"></iframe>
           <div class="video-controls">
-            <button id="closeVideoButton">Close Video</button>
+            <button id="closeVideoButton" aria-label="Close video player">Close Video</button>
           </div>
         </div>
-      </div>
+      </section>
       
-      <div class="chart-section">
-        <h2>REEF Stacked Bar</h2>
+      <section class="chart-section" aria-labelledby="reefChartTitle">
+        <h2 id="reefChartTitle">REEF Stacked Bar</h2>
         <div class="chart-container">
-        <button id="toggleModeButton">Switch to Auto</button>
-          <canvas id="reefChart"></canvas>
+          <button id="toggleModeButton" aria-label="Toggle between teleop and autonomous scoring modes">Switch to Auto</button>
+          <canvas id="reefChart" role="img" aria-label="Reef scoring stacked bar chart"></canvas>
         </div>
         <p class="desc">
           Shows L1 (trough), L2 (botRow), L3 (midRow), L4 (topRow) stacked for each team.
         </p>
-      </div>
-      <div class="chart-section">
-        <h2>Algae + Endgame Stacked Bar</h2>
+      </section>
+      <section class="chart-section" aria-labelledby="algaeEndChartTitle">
+        <h2 id="algaeEndChartTitle">Algae + Endgame Stacked Bar</h2>
         <div class="chart-container">
-          <canvas id="algaeEndChart"></canvas>
+          <canvas id="algaeEndChart" role="img" aria-label="Algae and endgame scoring stacked bar chart"></canvas>
         </div>
         <p class="desc">
           Stacked bars for Processor (wall), Net (net), and Endgame Barge (end) points per team.
         </p>
-      </div>
-      <div class="chart-section">
-        <h2>Overall Ranking</h2>
+      </section>
+      <section class="chart-section" aria-labelledby="rankingTableTitle">
+        <h2 id="rankingTableTitle">Overall Ranking</h2>
         <p class="desc">
           Sum of all Reef & Algae/Endgame categories. Sorted high to low.
         </p>
-        <table id="rankingTable">
+        <table id="rankingTable" aria-label="Team rankings by total average score">
           <thead>
             <tr>
-              <th class="rank-col">Rank</th>
-              <th class="team-col">Team</th>
-              <th class="score-col">Total Avg</th>
+              <th class="rank-col" scope="col">Rank</th>
+              <th class="team-col" scope="col">Team</th>
+              <th class="score-col" scope="col">Total Avg</th>
             </tr>
           </thead>
           <tbody></tbody>
         </table>
-      </div>
+      </section>
       <p class="desc">
         Data is not team specific, only an approximation based on match scoring and team alliances.
       </p>
@@ -244,298 +322,625 @@
       </p>
     </main>
     <script>
+      // ============================================
+      // GLOBAL STATE
+      // ============================================
+
+      // Caching headers for TBA API requests
       let storedETag = null;
-      let storedLastMod = null;
+      let storedLastModified = null;
+
+      // Match data from TBA
       let matchData = [];
-      let currentMode = 'teleop'; // 'teleop' or 'auto'
+
+      // Current scoring mode: 'teleop' or 'auto'
+      let currentMode = 'teleop';
+
+      // Chart instances
       let reefChartInstance = null;
       let algaeEndChartInstance = null;
-      
-      /* Original REEFSCAPE functions */
+
+      // ============================================
+      // INITIALIZATION & LOCAL STORAGE
+      // ============================================
+
+      /**
+       * Initialize the application on page load
+       */
+      function initializeApp() {
+        loadSavedCredentials();
+        setupEnterKeyHandlers();
+      }
+
+      /**
+       * Load saved TBA key and event key from localStorage
+       */
+      function loadSavedCredentials() {
+        const savedTbaKey = localStorage.getItem('tbaKey');
+        const savedEventKey = localStorage.getItem('eventKey');
+
+        if (savedTbaKey) {
+          document.getElementById('tbaKey').value = savedTbaKey;
+        }
+        if (savedEventKey) {
+          document.getElementById('eventKey').value = savedEventKey;
+        }
+      }
+
+      /**
+       * Save credentials to localStorage
+       */
+      function saveCredentials(tbaKey, eventKey) {
+        localStorage.setItem('tbaKey', tbaKey);
+        localStorage.setItem('eventKey', eventKey);
+      }
+
+      /**
+       * Setup Enter key handlers for input fields
+       */
+      function setupEnterKeyHandlers() {
+        // Load data when Enter is pressed in TBA key or event key inputs
+        document.getElementById('tbaKey').addEventListener('keypress', (event) => {
+          if (event.key === 'Enter') {
+            loadData();
+          }
+        });
+
+        document.getElementById('eventKey').addEventListener('keypress', (event) => {
+          if (event.key === 'Enter') {
+            loadData();
+          }
+        });
+
+        // Search videos when Enter is pressed in team number input
+        document.getElementById('teamNumber').addEventListener('keypress', (event) => {
+          if (event.key === 'Enter') {
+            findTeamVideos();
+          }
+        });
+      }
+
+      // ============================================
+      // REEF SCORING FUNCTIONS
+      // ============================================
+
+      /**
+       * Get reef scoring categories based on current mode (teleop/auto)
+       * @returns {Array} Array of category objects with key and extractor function
+       */
       function getReefCategories() {
         if (currentMode === 'teleop') {
           return [
-            { k: 'l1', ex: a => a.teleopReef?.trough },
-            { k: 'l2', ex: a => a.teleopReef?.tba_botRowCount },
-            { k: 'l3', ex: a => a.teleopReef?.tba_midRowCount },
-            { k: 'l4', ex: a => a.teleopReef?.tba_topRowCount }
+            { key: 'l1', extractor: alliance => alliance.teleopReef?.trough },
+            { key: 'l2', extractor: alliance => alliance.teleopReef?.tba_botRowCount },
+            { key: 'l3', extractor: alliance => alliance.teleopReef?.tba_midRowCount },
+            { key: 'l4', extractor: alliance => alliance.teleopReef?.tba_topRowCount }
           ];
         } else {
           return [
-            { k: 'l1', ex: a => a.autoReef?.trough },
-            { k: 'l2', ex: a => a.autoReef?.tba_botRowCount },
-            { k: 'l3', ex: a => a.autoReef?.tba_midRowCount },
-            { k: 'l4', ex: a => a.autoReef?.tba_topRowCount }
+            { key: 'l1', extractor: alliance => alliance.autoReef?.trough },
+            { key: 'l2', extractor: alliance => alliance.autoReef?.tba_botRowCount },
+            { key: 'l3', extractor: alliance => alliance.autoReef?.tba_midRowCount },
+            { key: 'l4', extractor: alliance => alliance.autoReef?.tba_topRowCount }
           ];
         }
       }
 
-      function dynamicHeight(container, rowCount) {
-        container.style.height = Math.max(rowCount * 30, 400) + 'px';
+      /**
+       * Dynamically adjust container height based on number of rows
+       * @param {HTMLElement} container - The container element
+       * @param {number} rowCount - Number of data rows
+       */
+      function setDynamicHeight(container, rowCount) {
+        const minHeight = 400;
+        const heightPerRow = 30;
+        container.style.height = Math.max(rowCount * heightPerRow, minHeight) + 'px';
       }
 
+      // ============================================
+      // THE BLUE ALLIANCE API
+      // ============================================
+
+      /**
+       * Fetch data from The Blue Alliance API with caching support
+       * @param {string} endpoint - API endpoint (e.g., 'event/2025miket/matches')
+       * @param {string} tbaKey - TBA API authentication key
+       * @returns {Promise<Object|null>} JSON data or null if not modified (304)
+       * @throws {Error} If the request fails
+       */
       async function fetchTBA(endpoint, tbaKey) {
-        let url = 'https://www.thebluealliance.com/api/v3/' + endpoint;
-        let hdr = { 'X-TBA-Auth-Key': tbaKey, 'Accept-Encoding': 'gzip' };
-        if (storedETag) hdr['If-None-Match'] = storedETag;
-        if (storedLastMod) hdr['If-Modified-Since'] = storedLastMod;
-        let r = await fetch(url, { headers: hdr });
-        if (r.status === 304) return null;
-        if (!r.ok) throw new Error('TBA request fail: ' + r.status);
-        let e = r.headers.get('ETag'), lm = r.headers.get('Last-Modified');
-        if (e) storedETag = e;
-        if (lm) storedLastMod = lm;
-        return r.json();
+        const url = `https://www.thebluealliance.com/api/v3/${endpoint}`;
+        const headers = {
+          'X-TBA-Auth-Key': tbaKey,
+          'Accept-Encoding': 'gzip'
+        };
+
+        // Add caching headers if available
+        if (storedETag) {
+          headers['If-None-Match'] = storedETag;
+        }
+        if (storedLastModified) {
+          headers['If-Modified-Since'] = storedLastModified;
+        }
+
+        const response = await fetch(url, { headers });
+
+        // Data not modified - use cached version
+        if (response.status === 304) {
+          return null;
+        }
+
+        // Handle errors
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Invalid TBA API key. Please check your credentials.');
+          } else if (response.status === 404) {
+            throw new Error('Event not found. Please verify the event key.');
+          } else {
+            throw new Error(`TBA API request failed with status ${response.status}`);
+          }
+        }
+
+        // Update cache headers for future requests
+        const etag = response.headers.get('ETag');
+        const lastModified = response.headers.get('Last-Modified');
+        if (etag) storedETag = etag;
+        if (lastModified) storedLastModified = lastModified;
+
+        return response.json();
       }
 
-      function aggregator(matches, catMap) {
-        let dataMap = {}, mCount = {};
-        for (let m of matches) {
-          let b = m?.score_breakdown?.blue;
-          let r = m?.score_breakdown?.red;
-          let tB = m?.alliances?.blue?.team_keys || [];
-          let tR = m?.alliances?.red?.team_keys || [];
-          if (!b || !r) continue;
-          for (let c of catMap) {
-            let vB = c.ex(b) || 0;
-            let vR = c.ex(r) || 0;
-            for (let tm of tB) {
-              if (!dataMap[tm]) dataMap[tm] = {};
-              if (!dataMap[tm][c.k]) dataMap[tm][c.k] = 0;
-              dataMap[tm][c.k] += vB;
-              mCount[tm] = (mCount[tm] || 0) + 1;
+      // ============================================
+      // DATA AGGREGATION
+      // ============================================
+
+      /**
+       * Aggregate scoring data for all teams across matches
+       * Calculates average scores per team for each category
+       * @param {Array} matches - Array of match objects from TBA
+       * @param {Array} categories - Array of category objects with key and extractor
+       * @returns {Object} Map of team keys to average category scores
+       */
+      function aggregateTeamData(matches, categories) {
+        const teamData = {};
+        const matchCounts = {};
+
+        // Aggregate scores for each match
+        for (const match of matches) {
+          const blueAlliance = match?.score_breakdown?.blue;
+          const redAlliance = match?.score_breakdown?.red;
+          const blueTeams = match?.alliances?.blue?.team_keys || [];
+          const redTeams = match?.alliances?.red?.team_keys || [];
+
+          // Skip matches without score breakdowns
+          if (!blueAlliance || !redAlliance) continue;
+
+          // Process each scoring category
+          for (const category of categories) {
+            const blueValue = category.extractor(blueAlliance) || 0;
+            const redValue = category.extractor(redAlliance) || 0;
+
+            // Add scores for blue alliance teams
+            for (const teamKey of blueTeams) {
+              if (!teamData[teamKey]) teamData[teamKey] = {};
+              if (!teamData[teamKey][category.key]) teamData[teamKey][category.key] = 0;
+              teamData[teamKey][category.key] += blueValue;
+              matchCounts[teamKey] = (matchCounts[teamKey] || 0) + 1;
             }
-            for (let tm of tR) {
-              if (!dataMap[tm]) dataMap[tm] = {};
-              if (!dataMap[tm][c.k]) dataMap[tm][c.k] = 0;
-              dataMap[tm][c.k] += vR;
-              mCount[tm] = (mCount[tm] || 0) + 1;
+
+            // Add scores for red alliance teams
+            for (const teamKey of redTeams) {
+              if (!teamData[teamKey]) teamData[teamKey] = {};
+              if (!teamData[teamKey][category.key]) teamData[teamKey][category.key] = 0;
+              teamData[teamKey][category.key] += redValue;
+              matchCounts[teamKey] = (matchCounts[teamKey] || 0) + 1;
             }
           }
         }
-        for (let tm in dataMap) {
-          let played = mCount[tm] || 1;
-          for (let cat in dataMap[tm]) {
-            dataMap[tm][cat] = dataMap[tm][cat] / played;
+
+        // Calculate averages
+        for (const teamKey in teamData) {
+          const matchesPlayed = matchCounts[teamKey] || 1;
+          for (const categoryKey in teamData[teamKey]) {
+            teamData[teamKey][categoryKey] /= matchesPlayed;
           }
         }
-        return dataMap;
+
+        return teamData;
       }
 
-      function createStackedChart(canvasId, dataMap, catKeys, catLabels, catColors, title) {
-        let container = document.getElementById(canvasId).parentNode;
-        let teams = Object.keys(dataMap);
-        teams.sort((a, b) => {
-          let sA = 0, sB = 0;
-          for (let ck of catKeys) {
-            sA += dataMap[a][ck] || 0;
-            sB += dataMap[b][ck] || 0;
+      // ============================================
+      // CHART CREATION
+      // ============================================
+
+      /**
+       * Create a horizontal stacked bar chart using Chart.js
+       * @param {string} canvasId - ID of the canvas element
+       * @param {Object} teamDataMap - Map of team keys to category scores
+       * @param {Array<string>} categoryKeys - Array of category keys
+       * @param {Array<string>} categoryLabels - Array of display labels for categories
+       * @param {Array<string>} categoryColors - Array of colors for each category
+       * @param {string} chartTitle - Title for the chart
+       * @returns {Chart} Chart.js instance
+       */
+      function createStackedChart(canvasId, teamDataMap, categoryKeys, categoryLabels, categoryColors, chartTitle) {
+        const container = document.getElementById(canvasId).parentNode;
+        const teamKeys = Object.keys(teamDataMap);
+
+        // Sort teams by total score (descending)
+        teamKeys.sort((teamA, teamB) => {
+          let scoreA = 0;
+          let scoreB = 0;
+          for (const categoryKey of categoryKeys) {
+            scoreA += teamDataMap[teamA][categoryKey] || 0;
+            scoreB += teamDataMap[teamB][categoryKey] || 0;
           }
-          return sB - sA;
+          return scoreB - scoreA;
         });
-        dynamicHeight(container, teams.length);
-        let datasets = catKeys.map((ck, i) => ({
-          label: catLabels[i],
-          data: teams.map(x => dataMap[x][ck] || 0),
-          backgroundColor: catColors[i],
+
+        // Adjust container height based on number of teams
+        setDynamicHeight(container, teamKeys.length);
+
+        // Create datasets for each category
+        const datasets = categoryKeys.map((categoryKey, index) => ({
+          label: categoryLabels[index],
+          data: teamKeys.map(teamKey => teamDataMap[teamKey][categoryKey] || 0),
+          backgroundColor: categoryColors[index],
           hoverBackgroundColor: '#444'
         }));
+
+        // Create and return the chart
         return new Chart(document.getElementById(canvasId), {
           type: 'bar',
-          data: { labels: teams, datasets },
+          data: {
+            labels: teamKeys,
+            datasets: datasets
+          },
           options: {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
-            scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } },
-            plugins: {
-              title: { display: true, text: title, font: { size: 16 } },
-              tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.x.toFixed(2) } },
-              legend: { labels: { font: { size: 12 } } }
+            scales: {
+              x: { stacked: true, beginAtZero: true },
+              y: { stacked: true }
             },
-            animation: { duration: 800, easing: 'easeInOutCubic' },
+            plugins: {
+              title: {
+                display: true,
+                text: chartTitle,
+                font: { size: 16 }
+              },
+              tooltip: {
+                callbacks: {
+                  label: context => `${context.dataset.label}: ${context.parsed.x.toFixed(2)}`
+                }
+              },
+              legend: {
+                labels: { font: { size: 12 } }
+              }
+            },
+            animation: {
+              duration: 800,
+              easing: 'easeInOutCubic'
+            },
             barThickness: 16,
             maxBarThickness: 22
           }
         });
       }
 
-      function buildTable(tableSel, dataMap, catKeys) {
-        let tb = document.querySelector(tableSel + ' tbody');
-        tb.innerHTML = '';
-        let allTeams = Object.keys(dataMap);
-        let items = allTeams.map(t => {
-          let s = 0;
-          for (let ck of catKeys) s += dataMap[t][ck] || 0;
-          return { team: t, sum: s };
+      // ============================================
+      // TABLE BUILDING
+      // ============================================
+
+      /**
+       * Build and populate the ranking table
+       * @param {string} tableSelector - CSS selector for the table
+       * @param {Object} teamDataMap - Map of team keys to category scores
+       * @param {Array<string>} categoryKeys - Array of category keys to sum
+       */
+      function buildRankingTable(tableSelector, teamDataMap, categoryKeys) {
+        const tbody = document.querySelector(`${tableSelector} tbody`);
+        tbody.innerHTML = '';
+
+        const teamKeys = Object.keys(teamDataMap);
+
+        // Calculate total scores for each team
+        const teamRankings = teamKeys.map(teamKey => {
+          let totalScore = 0;
+          for (const categoryKey of categoryKeys) {
+            totalScore += teamDataMap[teamKey][categoryKey] || 0;
+          }
+          return { team: teamKey, score: totalScore };
         });
-        items.sort((a, b) => b.sum - a.sum);
-        items.forEach((x, i) => {
-          let tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td class='rank-col'>${i + 1}</td>
-            <td class='team-col'>${x.team}</td>
-            <td class='score-col'>${x.sum.toFixed(2)}</td>
+
+        // Sort by score (descending)
+        teamRankings.sort((a, b) => b.score - a.score);
+
+        // Populate table rows
+        teamRankings.forEach((ranking, index) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td class='rank-col'>${index + 1}</td>
+            <td class='team-col'>${ranking.team}</td>
+            <td class='score-col'>${ranking.score.toFixed(2)}</td>
           `;
-          tb.appendChild(tr);
+          tbody.appendChild(row);
         });
       }
 
+      // ============================================
+      // DATA DOWNLOAD
+      // ============================================
+
+      /**
+       * Download the raw match data as a JSON file
+       */
       function downloadRawData() {
         if (!matchData || !Array.isArray(matchData) || matchData.length === 0) {
-          alert('No data loaded yet');
+          alert('No data loaded yet. Please load data first.');
           return;
         }
-        let str = JSON.stringify(matchData, null, 2);
-        let blob = new Blob([str], { type: 'application/json' });
-        let url = URL.createObjectURL(blob);
-        let a = document.createElement('a');
-        a.href = url;
-        a.download = 'tba_raw_data.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+
+        // Convert data to JSON string
+        const jsonString = JSON.stringify(matchData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        // Create temporary download link
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = 'tba_raw_data.json';
+
+        // Trigger download
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+
+        // Cleanup
+        document.body.removeChild(downloadLink);
         URL.revokeObjectURL(url);
       }
 
-      async function loadData() {
-        let st = document.getElementById('status');
-        let tba = document.getElementById('tbaKey').value.trim();
-        let evt = document.getElementById('eventKey').value.trim();
-        if (!tba || !evt) {
-          st.textContent = 'Enter TBA key and event key';
-          return;
-        }
-        try {
-          st.textContent = 'Loading...';
-          let d = await fetchTBA(`event/${evt}/matches`, tba);
-          if (d === null) {
-            st.textContent = 'Data not modified';
-          } else if (!Array.isArray(d)) {
-            console.error('No valid matches array', d);
-            st.textContent = 'No valid matches array';
-            return;
-          } else {
-            matchData = d;
-            console.log('Fetched matches', matchData);
-            st.textContent = `Fetched ${matchData.length} matches`;
-          }
-          if (!Array.isArray(matchData) || matchData.length === 0) {
-            st.textContent = 'No match data';
-            return;
-          }
-          document.getElementById('downloadButton').disabled = false;
-          updateCharts();
-        } catch (e) {
-          console.error(e);
-          st.textContent = 'Error: ' + e.message;
+      // ============================================
+      // UI HELPER FUNCTIONS
+      // ============================================
+
+      /**
+       * Set loading state on an element
+       * @param {HTMLElement} element - Element to update
+       * @param {boolean} isLoading - Whether loading is active
+       */
+      function setLoadingState(element, isLoading) {
+        if (isLoading) {
+          element.innerHTML = element.textContent + ' <span class="spinner"></span>';
         }
       }
 
-      function updateCharts() {
-        let reefCats = getReefCategories();
-        let algaeEndCats = [
-          { k: 'wall', ex: a => a.wallAlgaeCount },
-          { k: 'net', ex: a => a.netAlgaeCount },
-          { k: 'end', ex: a => a.endGameBargePoints }
-        ];
-        let allCats = [...reefCats, ...algaeEndCats];
-        let reefDataMap = aggregator(matchData, reefCats);
-        let algaeEndDataMap = aggregator(matchData, algaeEndCats);
-        let overallDataMap = aggregator(matchData, allCats);
+      /**
+       * Validate and show error state on input
+       * @param {HTMLInputElement} input - Input element to validate
+       * @returns {boolean} Whether input is valid
+       */
+      function validateInput(input) {
+        const isValid = input.value.trim().length > 0;
+        if (!isValid) {
+          input.classList.add('error');
+          setTimeout(() => input.classList.remove('error'), 300);
+        }
+        return isValid;
+      }
 
+      // ============================================
+      // DATA LOADING
+      // ============================================
+
+      /**
+       * Load match data from The Blue Alliance API
+       */
+      async function loadData() {
+        const statusElement = document.getElementById('status');
+        const tbaKeyInput = document.getElementById('tbaKey');
+        const eventKeyInput = document.getElementById('eventKey');
+        const loadButton = document.getElementById('loadButton');
+
+        const tbaKey = tbaKeyInput.value.trim();
+        const eventKey = eventKeyInput.value.trim();
+
+        // Validate inputs
+        if (!tbaKey || !eventKey) {
+          statusElement.textContent = 'Please enter both TBA key and event key';
+          if (!tbaKey) validateInput(tbaKeyInput);
+          if (!eventKey) validateInput(eventKeyInput);
+          return;
+        }
+
+        try {
+          // Save credentials to localStorage
+          saveCredentials(tbaKey, eventKey);
+
+          // Show loading state
+          loadButton.disabled = true;
+          statusElement.textContent = 'Loading match data...';
+          setLoadingState(statusElement, true);
+
+          // Fetch data from TBA
+          const data = await fetchTBA(`event/${eventKey}/matches`, tbaKey);
+
+          if (data === null) {
+            // Data not modified (304 response)
+            statusElement.textContent = 'Data not modified (using cached version)';
+          } else if (!Array.isArray(data)) {
+            console.error('Invalid data format:', data);
+            statusElement.textContent = 'Error: Invalid data format received';
+            return;
+          } else {
+            matchData = data;
+            console.log(`Fetched ${matchData.length} matches`, matchData);
+            statusElement.textContent = `Successfully loaded ${matchData.length} matches`;
+          }
+
+          // Verify we have data to display
+          if (!Array.isArray(matchData) || matchData.length === 0) {
+            statusElement.textContent = 'No match data available for this event';
+            return;
+          }
+
+          // Enable download button and update visualizations
+          document.getElementById('downloadButton').disabled = false;
+          updateCharts();
+
+        } catch (error) {
+          console.error('Error loading data:', error);
+          statusElement.textContent = `Error: ${error.message}`;
+        } finally {
+          // Remove loading state
+          loadButton.disabled = false;
+        }
+      }
+
+      /**
+       * Update all charts and the ranking table with current data
+       */
+      function updateCharts() {
+        // Define scoring categories
+        const reefCategories = getReefCategories();
+        const algaeEndCategories = [
+          { key: 'wall', extractor: alliance => alliance.wallAlgaeCount },
+          { key: 'net', extractor: alliance => alliance.netAlgaeCount },
+          { key: 'end', extractor: alliance => alliance.endGameBargePoints }
+        ];
+        const allCategories = [...reefCategories, ...algaeEndCategories];
+
+        // Aggregate team data
+        const reefData = aggregateTeamData(matchData, reefCategories);
+        const algaeEndData = aggregateTeamData(matchData, algaeEndCategories);
+        const overallData = aggregateTeamData(matchData, allCategories);
+
+        // Destroy existing chart instances
         if (reefChartInstance) reefChartInstance.destroy();
         if (algaeEndChartInstance) algaeEndChartInstance.destroy();
 
-        reefChartInstance = createStackedChart('reefChart', reefDataMap,
+        // Create reef scoring chart
+        reefChartInstance = createStackedChart(
+          'reefChart',
+          reefData,
           ['l1', 'l2', 'l3', 'l4'],
           ['L1', 'L2', 'L3', 'L4'],
           ['#3366cc', '#dc3912', '#ff9900', '#109618'],
-          'REEF L1–L4 (' + currentMode + ')'
+          `REEF L1–L4 (${currentMode})`
         );
-        algaeEndChartInstance = createStackedChart('algaeEndChart', algaeEndDataMap,
+
+        // Create algae/endgame chart
+        algaeEndChartInstance = createStackedChart(
+          'algaeEndChart',
+          algaeEndData,
           ['wall', 'net', 'end'],
           ['Processor', 'Net', 'Endgame'],
           ['#990099', '#0099c6', '#dd4477'],
           'Algae + Endgame'
         );
-        buildTable('#rankingTable', overallDataMap, ['l1', 'l2', 'l3', 'l4', 'wall', 'net', 'end']);
+
+        // Build ranking table
+        buildRankingTable(
+          '#rankingTable',
+          overallData,
+          ['l1', 'l2', 'l3', 'l4', 'wall', 'net', 'end']
+        );
       }
 
+      /**
+       * Toggle between teleop and autonomous scoring modes
+       */
       function toggleMode() {
+        // Switch mode
         currentMode = (currentMode === 'teleop') ? 'auto' : 'teleop';
-        document.getElementById('toggleModeButton').textContent =
-          (currentMode === 'teleop') ? 'Switch to Auto' : 'Switch to Teleop';
+
+        // Update button text
+        const toggleButton = document.getElementById('toggleModeButton');
+        toggleButton.textContent = (currentMode === 'teleop') ? 'Switch to Auto' : 'Switch to Teleop';
+
+        // Update charts if data is loaded
         if (matchData && matchData.length > 0) {
           updateCharts();
         }
       }
       
-      /* New Team Video Lookup functions */
+      // ============================================
+      // TEAM VIDEO LOOKUP
+      // ============================================
+
+      /**
+       * Find and display match videos for a specific team
+       */
       async function findTeamVideos() {
         const videoStatus = document.getElementById('videoStatus');
         const videoList = document.getElementById('videoList');
         const teamNumberInput = document.getElementById('teamNumber');
         const eventKeyInput = document.getElementById('eventKey');
         const tbaKeyInput = document.getElementById('tbaKey');
-        
+        const searchButton = document.getElementById('searchTeamButton');
+
         const teamNumber = teamNumberInput.value.trim();
         const eventKey = eventKeyInput.value.trim();
         const tbaKey = tbaKeyInput.value.trim();
-        
+
+        // Validate inputs
         if (!teamNumber) {
           videoStatus.textContent = 'Please enter a team number';
+          validateInput(teamNumberInput);
           return;
         }
-        
+
         if (!eventKey) {
-          videoStatus.textContent = 'Please enter an event key';
+          videoStatus.textContent = 'Please enter an event key first';
+          validateInput(eventKeyInput);
           return;
         }
-        
+
         if (!tbaKey) {
-          videoStatus.textContent = 'Please enter a TBA API key';
+          videoStatus.textContent = 'Please enter a TBA API key first';
+          validateInput(tbaKeyInput);
           return;
         }
-        
-        // Reset the video container and list
+
+        // Reset the video container and show loading state
         document.getElementById('videoContainer').style.display = 'none';
-        videoList.innerHTML = '<div class="state-loading">Loading videos for team ' + teamNumber + '...</div>';
+        videoList.innerHTML = `<div class="state-loading">Loading videos for team ${teamNumber}...</div>`;
         videoStatus.textContent = 'Searching for videos...';
-        
+        searchButton.disabled = true;
+
         try {
           // Build the team key (e.g., "frc254")
-          const teamKey = 'frc' + teamNumber;
+          const teamKey = `frc${teamNumber}`;
           
           // Fetch team matches at the specified event
           const matches = await fetchTBA(`team/${teamKey}/event/${eventKey}/matches`, tbaKey);
-          
+
           if (!matches || !Array.isArray(matches) || matches.length === 0) {
             videoList.innerHTML = '<div class="state-no-results">No matches found for this team at this event.</div>';
             videoStatus.textContent = 'No matches found.';
             return;
           }
-          
+
           // Extract videos from matches
           const videos = [];
           for (const match of matches) {
             if (match.videos && match.videos.length > 0) {
               for (const video of match.videos) {
-                // Currently only support YouTube
+                // Currently only support YouTube videos
                 if (video.type === 'youtube') {
-                  // Create video entry
                   videos.push({
                     key: video.key,
-                    match_key: match.key,
-                    comp_level: match.comp_level,
-                    match_number: match.match_number,
-                    set_number: match.set_number,
-                    actual_time: match.actual_time || match.predicted_time,
-                    blue_teams: match.alliances?.blue?.team_keys || [],
-                    red_teams: match.alliances?.red?.team_keys || [],
-                    blue_score: match.alliances?.blue?.score,
-                    red_score: match.alliances?.red?.score,
-                    winning_alliance: match.winning_alliance
+                    matchKey: match.key,
+                    competitionLevel: match.comp_level,
+                    matchNumber: match.match_number,
+                    setNumber: match.set_number,
+                    actualTime: match.actual_time || match.predicted_time,
+                    blueTeams: match.alliances?.blue?.team_keys || [],
+                    redTeams: match.alliances?.red?.team_keys || [],
+                    blueScore: match.alliances?.blue?.score,
+                    redScore: match.alliances?.red?.score,
+                    winningAlliance: match.winning_alliance
                   });
                 }
               }
@@ -544,116 +949,134 @@
           
           // Sort videos by match time (if available) or match number
           videos.sort((a, b) => {
-            if (a.actual_time && b.actual_time) {
-              return a.actual_time - b.actual_time;
+            if (a.actualTime && b.actualTime) {
+              return a.actualTime - b.actualTime;
             }
-            if (a.comp_level !== b.comp_level) {
-              // Order: qm, ef, qf, sf, f
+            if (a.competitionLevel !== b.competitionLevel) {
+              // Order: qm (qualifications), ef, qf, sf, f (finals)
               const levels = { qm: 0, ef: 1, qf: 2, sf: 3, f: 4 };
-              return levels[a.comp_level] - levels[b.comp_level];
+              return levels[a.competitionLevel] - levels[b.competitionLevel];
             }
-            if (a.set_number !== b.set_number) {
-              return a.set_number - b.set_number;
+            if (a.setNumber !== b.setNumber) {
+              return a.setNumber - b.setNumber;
             }
-            return a.match_number - b.match_number;
+            return a.matchNumber - b.matchNumber;
           });
-          
+
           if (videos.length === 0) {
             videoList.innerHTML = '<div class="state-no-results">No videos found for this team at this event.</div>';
             videoStatus.textContent = 'No videos found.';
             return;
           }
-          
+
           // Format and display the videos
           videoList.innerHTML = '';
-          videos.forEach((video, index) => {
+          videos.forEach(video => {
             // Determine match type for display
-            let matchType;
-            switch (video.comp_level) {
-              case 'qm': matchType = 'Qualification'; break;
-              case 'ef': matchType = 'Eighth-Final'; break;
-              case 'qf': matchType = 'Quarter-Final'; break;
-              case 'sf': matchType = 'Semi-Final'; break;
-              case 'f': matchType = 'Final'; break;
-              default: matchType = video.comp_level.toUpperCase();
-            }
-            
-            // Add set number if applicable
-            const matchDisplay = video.comp_level !== 'qm' && video.set_number 
-              ? `${matchType} ${video.set_number}-${video.match_number}`
-              : `${matchType} ${video.match_number}`;
-            
-            // Determine which alliance the team is on
-            const isBlue = video.blue_teams.includes(teamKey);
-            const teamAlliance = isBlue ? 'blue' : 'red';
-            
-            // Determine if team won
-            const didWin = (teamAlliance === video.winning_alliance);
-            const matchResult = video.winning_alliance 
-              ? (didWin ? ' (Win)' : ' (Loss)') 
+            const matchTypeMap = {
+              'qm': 'Qualification',
+              'ef': 'Eighth-Final',
+              'qf': 'Quarter-Final',
+              'sf': 'Semi-Final',
+              'f': 'Final'
+            };
+            const matchType = matchTypeMap[video.competitionLevel] || video.competitionLevel.toUpperCase();
+
+            // Add set number if applicable (for playoff matches)
+            const matchDisplay = video.competitionLevel !== 'qm' && video.setNumber
+              ? `${matchType} ${video.setNumber}-${video.matchNumber}`
+              : `${matchType} ${video.matchNumber}`;
+
+            // Determine which alliance the team is on and if they won
+            const isBlueAlliance = video.blueTeams.includes(teamKey);
+            const teamAlliance = isBlueAlliance ? 'blue' : 'red';
+            const didWin = (teamAlliance === video.winningAlliance);
+            const matchResult = video.winningAlliance
+              ? (didWin ? ' (Win)' : ' (Loss)')
               : '';
-            
+
             // Create the video item element
             const videoItem = document.createElement('div');
             videoItem.className = 'video-item';
+            videoItem.setAttribute('role', 'listitem');
             videoItem.innerHTML = `
               <div class="video-title">${matchDisplay}${matchResult}</div>
               <div class="video-url">https://www.youtube.com/watch?v=${video.key}</div>
             `;
-            
+
             // Add click event to play the video
             videoItem.addEventListener('click', () => {
               playVideo(video.key);
             });
-            
+
+            // Add keyboard accessibility
+            videoItem.setAttribute('tabindex', '0');
+            videoItem.addEventListener('keypress', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                playVideo(video.key);
+              }
+            });
+
             videoList.appendChild(videoItem);
           });
-          
-          videoStatus.textContent = `Found ${videos.length} videos for team ${teamNumber} at this event.`;
-          
+
+          videoStatus.textContent = `Found ${videos.length} video${videos.length !== 1 ? 's' : ''} for team ${teamNumber}`;
+
         } catch (error) {
           console.error('Error fetching team videos:', error);
-          videoList.innerHTML = '<div class="state-no-results">Error fetching videos: ' + error.message + '</div>';
-          videoStatus.textContent = 'Error: ' + error.message;
+          videoList.innerHTML = `<div class="state-no-results">Error fetching videos: ${error.message}</div>`;
+          videoStatus.textContent = `Error: ${error.message}`;
+        } finally {
+          searchButton.disabled = false;
         }
       }
       
+      /**
+       * Play a YouTube video in the embedded player
+       * @param {string} videoKey - YouTube video ID
+       */
       function playVideo(videoKey) {
         const videoContainer = document.getElementById('videoContainer');
         const videoEmbed = document.getElementById('videoEmbed');
-        
+
         // Set up the YouTube embed URL
         videoEmbed.src = `https://www.youtube.com/embed/${videoKey}`;
-        
+
         // Show the video container
         videoContainer.style.display = 'block';
-        
+
         // Scroll to the video
-        videoContainer.scrollIntoView({ behavior: 'smooth' });
+        videoContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
-      
+
+      /**
+       * Close the video player and stop playback
+       */
       function closeVideo() {
         const videoContainer = document.getElementById('videoContainer');
         const videoEmbed = document.getElementById('videoEmbed');
-        
-        // Hide the container and clear the iframe source
+
+        // Hide the container and clear the iframe source (stops playback)
         videoContainer.style.display = 'none';
         videoEmbed.src = '';
       }
 
-      /* Event Listeners */
+      // ============================================
+      // EVENT LISTENERS
+      // ============================================
+
+      // Main data loading controls
       document.getElementById('loadButton').addEventListener('click', loadData);
       document.getElementById('downloadButton').addEventListener('click', downloadRawData);
       document.getElementById('toggleModeButton').addEventListener('click', toggleMode);
+
+      // Video search controls
       document.getElementById('searchTeamButton').addEventListener('click', findTeamVideos);
       document.getElementById('closeVideoButton').addEventListener('click', closeVideo);
-      
-      // Also allow pressing Enter in the team number input
-      document.getElementById('teamNumber').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          findTeamVideos();
-        }
-      });
+
+      // Initialize application on page load
+      window.addEventListener('DOMContentLoaded', initializeApp);
     </script>
   </body>
 </html>
